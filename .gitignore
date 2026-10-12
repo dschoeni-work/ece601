@@ -1,0 +1,23 @@
+# MNIST download and generated test vectors (recreate with model/train_quantize.py)
+model/data/
+firmware/test_data/
+
+# Build outputs
+firmware/test_mlp
+firmware/test_mlp.exe
+*.o
+
+# Python
+__pycache__/
+
+# Vivado project outputs
+*.cache/
+*.hw/
+*.runs/
+*.sim/
+*.ip_user_files/
+*.jou
+*.log
+*.str
+.venv/
+.DS_Store
