@@ -48,8 +48,9 @@ class QuantMLP:
         return np.clip(h, 0, 127), acc1
 
     def logits(self, img_u8):
-        """int64 logits, shape (N, 10). Accepts (784,) or (N, 784) uint8."""
-        img = np.atleast_2d(np.asarray(img_u8, dtype=np.uint8))
+        """int64 logits, shape (N, 10). Accepts uint8 images shaped (784,),
+        (28, 28), (N, 784) or (N, 28, 28)."""
+        img = np.asarray(img_u8, dtype=np.uint8).reshape(-1, 784)
         h, _ = self.hidden_q(img)
         return exact_matmul(h, self.w2) + self.b2
 

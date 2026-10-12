@@ -3,6 +3,8 @@ model/data/
 firmware/test_data/
 
 # Build outputs
+firmware/build/
+sim/obj_dir/
 firmware/test_mlp
 firmware/test_mlp.exe
 *.o
