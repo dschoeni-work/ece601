@@ -36,7 +36,6 @@ This is my EC601 project (Boston University, Fall 2026). The project:
 - [Demo Results](#demo-results)
 - [Repository Structure](#repository-structure)
 - [Known Limitations](#known-limitations)
-- [AI Usage](#ai-usage)
 - [API](#api)
 - [Maintainers](#maintainers)
 - [Thanks](#thanks)
