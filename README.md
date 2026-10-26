@@ -467,21 +467,6 @@ project).
   different training run than `model/quant_model.npz`, `board_test.py` reports
   that no logits match.
 
-## AI Usage
-
-I used generative AI in this project.
-
-- **Claude (Anthropic)** wrote the first version of the code in this
-  repository from my project plan and step-by-step requests, and explained each
-  part: model training and quantization (`model/`), the firmware (`firmware/`),
-  the SoC around PicoRV32 (`hw/rtl/soc.v`, `uart.v`, `basys3_top.v`), the
-  Verilator testbench (`sim/`), the drawing pad and board tools (`host/`) and
-  the Vivado scripts (`hw/*.tcl`). I ran and checked each step on my own
-  computers: training, the C vs Python test, the simulation and the drawing pad.
-- This README was drafted with Claude.
-- `hw/rtl/picorv32.v` is not AI-generated; it is the open-source PicoRV32 core,
-  used unmodified.
-
 ## API
 
 The modules can also be used from Python without the drawing pad:
@@ -516,6 +501,8 @@ with Board() as b:                              # finds the Basys 3 by itself
 ## Maintainers
 
 - Ian Peng ([@ianpeng-hw](https://github.com/ianpeng-hw))
+-
+- 
 
 ## Thanks
 
@@ -527,7 +514,6 @@ with Board() as b:                              # finds the Basys 3 by itself
 
 ## Contributing
 
-This is a solo course project, so I am not accepting outside contributions.
 
 ## License
 
