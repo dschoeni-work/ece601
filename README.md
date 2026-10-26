@@ -33,6 +33,7 @@ This is my EC601 project (Boston University, Fall 2026). The project:
   - [4. Drawing pad](#4-drawing-pad)
   - [5. Test on your own drawings](#5-test-on-your-own-drawings)
 - [FPGA Deployment](#fpga-deployment)
+  - [Troubleshooting](#troubleshooting)
 - [Demo Results](#demo-results)
 - [Repository Structure](#repository-structure)
 - [Known Limitations](#known-limitations)
@@ -340,6 +341,28 @@ All numbers are little-endian.
 | `0x1000_0004` | UART status: bit 0 = transmitter busy, bit 1 = byte received |
 | `0x1000_0008` | LEDs (bits 15:0) |
 | `0x1000_000C` | 7-segment: bits 15:0 = four hex digits, bits 19:16 = digits turned on |
+
+### Troubleshooting
+
+**`hw/firmware.mem` disappeared.** After the first build on Windows,
+`hw/firmware.mem` was missing from the cloned repository. The Vivado log showed
+that the build had read it (`$readmem data file 'firmware.mem' is read
+successfully`), so that bitstream was fine and the file was removed afterwards.
+The script had been run while a Vivado GUI project was open, which adds
+`firmware.mem` to that project's sources; most likely it was then removed from
+the project with the option to also delete it from disk. The fix was to
+restore it from git:
+
+```
+git restore hw/firmware.mem
+```
+
+To avoid it, run `build.tcl` with no project open, and in a GUI project never
+remove `firmware.mem` with "delete from disk". Two safety nets catch a missing
+file: `build.tcl` stops with an error before synthesis, and in the GUI flow the
+Messages window lacks the `read successfully` line. A bitstream built without
+the file has an empty RAM, so the CPU traps right after reset and LD15 lights
+up.
 
 ## Demo Results
 
