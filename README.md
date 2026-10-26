@@ -12,6 +12,9 @@ hw/rtl/soc.v                       SoC：CPU + 128 KB RAM + UART + LED/七段顯
 hw/rtl/uart.v                      UART 收發（8N1）
 hw/rtl/basys3_top.v                Basys 3 頂層：時脈、重置按鈕、七段顯示器掃描
 hw/constraints/basys3_soc.xdc      SoC 的 Basys 3 腳位
+hw/build.tcl                       Vivado 腳本：產生 bitstream（hw/build/basys3_soc.bit）
+hw/program.tcl                     Vivado 腳本：把 bitstream 燒進板子
+hw/firmware.mem                    韌體（firmware/build/firmware.hex 的副本，給 Vivado 用）
 firmware/start.S, link.ld          開機程式與記憶體配置
 firmware/main.c                    韌體：從 UART 收圖、推論、回傳結果與 cycle 數
 firmware/Makefile                  編譯韌體成 build/firmware.hex（make）與筆電測試（make test）
@@ -20,7 +23,9 @@ model/train_quantize.py            訓練 MNIST MLP、INT8 量化、輸出 C 權
 model/qmlp.py                      Python 整數推論，與 C 逐位元一致
 firmware/mlp.h, mlp.c              C 整數推論，之後直接放到 RISC-V 上跑
 firmware/test_mlp.c                在筆電上比對 C 與 Python 的結果
-host/draw_digit.py                 滑鼠畫板：畫數字、看模型輸入與即時辨識結果
+host/draw_digit.py                 滑鼠畫板：畫數字、看模型輸入與即時辨識結果（--board 時也送給板子辨識）
+host/board.py                      透過 USB-UART 跟板子溝通（自動找到 Basys 3）
+host/board_test.py                 在真的板子上跑 MNIST 測試圖，跟 Python 逐位元比對
 host/preprocess.py                 把滑鼠筆跡轉成 MNIST 格式的 28×28 圖
 host/test_preprocess.py            檢查前處理（不需要開視窗）
 host/eval_my_digits.py             計算模型在自己手寫數字上的準確率
@@ -139,6 +144,49 @@ make -C sim run N=200     # 測更多張
 
 板子收到圖後也會把結果顯示在最右邊的七段顯示器，並點亮對應編號的 LED；LED 15 亮代表 CPU 出錯（trap）。
 
+## 第 1 階段：上板
+
+**1. 更新韌體副本（Mac）**：Vivado 讀的是 `hw/firmware.mem`，它要跟 `model/quant_model.npz` 來自同一次訓練。每次重新訓練或改韌體後都要重做一次：
+
+```
+make -C firmware && cp firmware/build/firmware.hex hw/firmware.mem
+git add -A && git commit -m "Update firmware" && git push
+```
+
+**2. 產生 bitstream（Windows，Vivado）**：開「Vivado 2026.1 Tcl Shell」（或 Vivado 視窗下方的 Tcl Console），路徑用斜線 `/`：
+
+```
+cd C:/你的路徑/Ec601_mouseRISCV/hw
+source build.tcl
+```
+
+約 3–10 分鐘，最後印出 timing 有沒有過 100 MHz。輸出在 `hw/build/`（不會進 git）。
+
+**3. 燒進板子**：插上 micro-USB、打開電源開關：
+
+```
+source program.tcl
+```
+
+板子斷電就會忘記，重新插電後要再燒一次。
+
+**4. 在板子上跑測試**（同一台電腦，需要 `pip install numpy pyserial`）：
+
+```
+python host/board_test.py            # 100 張 MNIST 測試圖
+python host/board_test.py -n 1000
+```
+
+會自動找到板子的序列埠；找不到時用 `--list` 看有哪些，再用 `--port COM5`（Mac：`/dev/cu.usbserial-...`）指定。結果格式跟 Verilator 模擬相同，另外多一行在筆電上量到的來回時間（USB 傳輸 + 推論）。
+
+**5. 用畫板送圖給板子**：
+
+```
+python host/draw_digit.py --board
+```
+
+每畫完一筆（放開滑鼠），圖就會送到板子上，視窗左下顯示板子的答案、板子上的推論時間、含 USB 的來回時間，以及板子的 logits 是否跟筆電完全相同。
+
 ## 量化方式
 
 | 步驟 | 運算 | 資料型別 |
@@ -158,6 +206,6 @@ make -C sim run N=200     # 測更多張
 - [x] 第 0 階段：訓練、INT8 量化、C 推論與 Python 逐位元一致
 - [x] 第 0 階段：滑鼠畫板與 MNIST 式前處理
 - [ ] 第 0 階段：收集自己的手寫數字，測準確率
-- [ ] LED 測試上板（等 micro-USB 線）
 - [x] 第 1 階段：PicoRV32 SoC 模擬，與 Python 逐位元一致，純 CPU 約 2.19M cycle／張
-- [ ] 第 1 階段：Vivado 合成上板，畫板透過 UART 送圖給板子辨識
+- [x] 第 1 階段：Vivado 腳本、板子測試程式、畫板的 --board 模式（已用 Verilator 模擬 Basys 3 頂層在真實 115200 baud 下驗證）
+- [ ] 第 1 階段：在真的 Basys 3 上跑 board_test.py 與畫板

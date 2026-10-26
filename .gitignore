@@ -23,3 +23,7 @@ __pycache__/
 *.str
 .venv/
 .DS_Store
+
+# Vivado build outputs (hw/build.tcl); hw/firmware.mem IS committed
+hw/build/
+.Xil/

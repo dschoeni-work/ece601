@@ -13,12 +13,22 @@ Controls
                                (to measure accuracy on your own drawings), then clear
   x                            delete the last saved drawing (pressed the wrong digit)
 
-Usage: python draw_digit.py
+With --board, every finished stroke is also sent to the RISC-V CPU on the
+Basys 3 (programmed with hw/program.tcl), and the window shows the board's
+answer, its inference time and whether its logits match the laptop's.
+
+Usage:
+  python draw_digit.py                  laptop only
+  python draw_digit.py --board          also run on the board (finds it by itself)
+  python draw_digit.py --port COM5      same, with the serial port given
 """
+import argparse
 import datetime
 import json
 import os
+import queue
 import sys
+import threading
 import time
 import tkinter as tk
 from tkinter import ttk
@@ -66,9 +76,42 @@ def softmax(z):
     return e / e.sum()
 
 
+class BoardLink:
+    """Runs board.infer() on a background thread so the window never freezes.
+
+    Only the newest image is kept: if the user draws faster than the board
+    answers (about 0.1 s per image), older images are skipped.
+    """
+
+    def __init__(self, board):
+        self.board = board
+        self.results = queue.Queue()     # (request id, image, Result or Exception)
+        self._cv = threading.Condition()
+        self._job = None
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def submit(self, job_id, img):
+        with self._cv:
+            self._job = (job_id, img)
+            self._cv.notify()
+
+    def _run(self):
+        while True:
+            with self._cv:
+                while self._job is None:
+                    self._cv.wait()
+                job_id, img = self._job
+                self._job = None
+            try:
+                self.results.put((job_id, img, self.board.infer(img)))
+            except Exception as e:  # BoardError or a serial error: shown in the window
+                self.results.put((job_id, img, e))
+
+
 class App:
-    def __init__(self, root, model, logit_scale):
+    def __init__(self, root, model, logit_scale, link=None, port=None):
         self.root, self.model, self.logit_scale = root, model, logit_scale
+        self.link, self.job_id = link, 0
         self.strokes = []
         self.saved = []         # drawings saved in this session, newest last
         self.pred = None
@@ -95,6 +138,21 @@ class App:
         ttk.Button(buttons, text="Undo (Backspace)", command=self.undo).pack(side="left", padx=px(8))
         ttk.Button(buttons, text="Delete last save (x)", command=self.delete_last_save).pack(side="left")
 
+        if link is not None:
+            board = tk.Frame(left, bg=BG)
+            board.pack(anchor="w", fill="x", pady=(px(14), 0))
+            tk.Label(board, text=f"On the board (RISC-V on Basys 3, {port})", bg=BG, fg=MUTED,
+                     font=("Helvetica", 11)).pack(anchor="w")
+            row = tk.Frame(board, bg=BG)
+            row.pack(anchor="w", fill="x")
+            self.board_digit = tk.Label(row, text="–", bg=BG, fg=FG, width=2, anchor="w",
+                                        font=("Helvetica", 36, "bold"))
+            self.board_digit.pack(side="left")
+            self.board_info = tk.Label(row, text="Lift the mouse to send the drawing to the board.",
+                                       bg=BG, fg=MUTED, font=("Helvetica", 11), justify="left", anchor="w")
+            self.board_info.pack(side="left", padx=(px(8), 0))
+            root.after(30, self.poll_board)
+
         side = tk.Frame(root, bg=BG)
         side.grid(row=0, column=1, sticky="n", padx=(0, px(16)), pady=(px(16), 0))
         tk.Label(side, text="Model input (28 × 28)", bg=BG, fg=MUTED,
@@ -103,7 +161,8 @@ class App:
         self.preview = tk.Label(side, bg=PAPER, width=size, height=size, bd=0)
         self.preview.pack(anchor="w", pady=(px(4), px(12)))
 
-        tk.Label(side, text="Prediction", bg=BG, fg=MUTED, font=("Helvetica", 11)).pack(anchor="w")
+        tk.Label(side, text="Prediction" if link is None else "On the laptop (Python)", bg=BG, fg=MUTED,
+                 font=("Helvetica", 11)).pack(anchor="w")
         self.pred_label = tk.Label(side, text="–", bg=BG, fg=FG, font=("Helvetica", 48, "bold"))
         self.pred_label.pack(anchor="w")
 
@@ -154,17 +213,55 @@ class App:
 
     def on_up(self, e):
         self.predict()
+        self.send_to_board()
 
     def clear(self):
         self.strokes = []
         self.canvas.delete("ink")
         self.predict()
+        self.send_to_board()
 
     def undo(self):
         if self.strokes:
             self.canvas.delete(f"s{len(self.strokes) - 1}")
             self.strokes.pop()
             self.predict()
+            self.send_to_board()
+
+    # ------------------------------------------------------------ board
+
+    def send_to_board(self):
+        """Send the current drawing to the board; answers to older drawings are ignored."""
+        if self.link is None:
+            return
+        self.job_id += 1
+        img = strokes_to_mnist(self.strokes)
+        if img is None:
+            self.board_digit.configure(text="–")
+            self.board_info.configure(text="Lift the mouse to send the drawing to the board.")
+            return
+        self.board_info.configure(text="Running on the board…")
+        self.link.submit(self.job_id, img)
+
+    def poll_board(self):
+        try:
+            while True:
+                job_id, img, r = self.link.results.get_nowait()
+                if job_id != self.job_id:
+                    continue                      # the drawing changed since it was sent
+                if isinstance(r, Exception):
+                    self.board_digit.configure(text="?")
+                    self.board_info.configure(text=f"Board error: {r}")
+                    continue
+                same = np.array_equal(r.logits, self.model.logits(img)[0])
+                self.board_digit.configure(text=str(r.digit))
+                self.board_info.configure(
+                    text=f"{r.compute_ms:.2f} ms on the board ({r.cycles:,} cycles)\n"
+                         f"{r.round_trip_ms:.0f} ms round trip, including the USB cable\n"
+                         + ("Same logits as the laptop ✓" if same else "Logits DIFFER from the laptop"))
+        except queue.Empty:
+            pass
+        self.root.after(30, self.poll_board)
 
     # -------------------------------------------------------- inference
 
@@ -227,6 +324,7 @@ class App:
         self.canvas.delete("ink")
         self.pred = None
         self.show(None)
+        self.send_to_board()
 
     def delete_last_save(self):
         if not self.saved:
@@ -244,6 +342,11 @@ class App:
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--board", action="store_true", help="also run each drawing on the Basys 3")
+    ap.add_argument("--port", help="the board's serial port, e.g. COM5 (implies --board)")
+    args = ap.parse_args()
+
     if sys.platform == "win32":  # sharp text on high-DPI Windows screens
         try:
             import ctypes
@@ -251,8 +354,19 @@ def main():
         except Exception:
             pass
     model, logit_scale = load_model()
+
+    link = port = None
+    if args.board or args.port:
+        from board import Board, BoardError
+        try:
+            b = Board(args.port)
+        except BoardError as e:
+            sys.exit(str(e))
+        link, port = BoardLink(b), b.port
+        print(f"Connected to the board on {port}")
+
     root = tk.Tk()
-    App(root, model, logit_scale)
+    App(root, model, logit_scale, link, port)
     root.after(200, root.focus_force)
     root.mainloop()
 

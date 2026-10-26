@@ -29,7 +29,7 @@ module basys3_top (
     wire        trap;
 
     soc #(
-        .MEM_INIT     ("firmware.hex"),
+        .MEM_INIT     ("firmware.mem"),     // hw/firmware.mem, a copy of firmware/build/firmware.hex
         .CLKS_PER_BIT (868)              // 115200 baud
     ) u_soc (
         .clk       (clk),
