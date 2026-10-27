@@ -1,0 +1,21 @@
+1. Title.  DNN Mouse Reader on FPGA, David Schoening, Ian Peng, Sirena Sun
+2. Mission.  For embedded-ML engineers and students who need to know whether a custom accelerator is worth the silicon, the Systolic-Array Inference Benchmark is an FPGA-based measurement platform that quantifies how much a systolic-array accelerator speeds up neural-network inference on a RISC-V CPU using live mouse-drawn input, and how that speedup changes as the model grows, unlike offline benchmarks on fixed datasets or peak-throughput and simulation estimates, it measures end-to-end speedup on real hardware.
+3. User stories:
+    As an embedded-ML engineer evaluating hardware options, I want to run the same neural network on the RISC-V CPU alone and on the CPU with the systolic-array accelerator, so that I can see the measured speedup on real hardware before deciding whether the accelerator is worth the silicon.
+    As a student learning about hardware acceleration, I want to draw digits with my mouse and watch both the CPU-only and accelerated paths classify them live, so that I can see for myself how the accelerator changes inference time on real input.
+    As an FPGA designer, I want to sweep the model across increasing layer widths and depths and plot speedup against model size, so that I can find where the accelerator’s advantage grows, plateaus, or breaks down.
+    As a performance engineer, I want end-to-end latency broken down into data transfer, compute, and CPU overhead for each run, so that I can tell whether the accelerator or the memory path is the bottleneck.
+    As a technical lead presenting to my team, I want to export benchmark results (speedup, latency, and model configuration) from each run, so that I can back up an accelerator decision with reproducible numbers instead of peak-throughput claims.
+4. Tools.  
+    Vivado: Write HDL
+    Python: Write Neural network
+    GitHub: Collaboration
+    Pytorch: Train the model
+    FPGA Board: Runs the model
+5. Progress.
+    @Ian will talk
+6. What you learned.  
+    We just started. Have not been able to run AI against each other.
+    @dschoeni-work will work
+7. Sprint 2 goals.  Your demo sentence for the next two weeks, plus where you are stuck and what help you need.
+    @Sirena?

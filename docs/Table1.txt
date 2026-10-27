@@ -1,0 +1,7 @@
+This table was from class 10/5/26
+
+Data: Stored in the FPGA as long as it reminas pwoered.
+
+Change: 
+
+Is it Privacy, AI, or Security and Export?
