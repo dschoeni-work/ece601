@@ -523,7 +523,7 @@ with Board() as b:                              # finds the Basys 3 by itself
 ## Maintainers
 
 - Ian Peng ([@ianpeng-hw](https://github.com/ianpeng-hw))
--
+- David Schoening ([@dschoeni-work](https://github.com/dschoeni-work))
 - 
 
 ## Thanks
