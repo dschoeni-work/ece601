@@ -235,6 +235,19 @@ and checks that accuracy stays the same (reference: 97.50% → 97.65%).
 
 ## FPGA Deployment
 
+Two boards are supported. They run the same SoC and firmware; only the top
+level, the pin file and the FPGA part differ:
+
+| | Basys 3 | Nexys A7-100T |
+|---|---|---|
+| FPGA part | `xc7a35tcpg236-1` | `xc7a100tcsg324-1` |
+| Top module | `basys3_top` (`hw/rtl/basys3_top.v`) | `nexys_a7_top` (`hw/rtl/nexys_a7_top.v`) |
+| Constraints | `hw/constraints/basys3_soc.xdc` | `hw/constraints/nexys_a7_soc.xdc` |
+| Tcl scripts | `source build.tcl` | `set board nexys_a7`, then `source build.tcl` |
+
+The steps below use the Basys 3 names; for the Nexys A7-100T, use the
+right-hand column instead.
+
 ### 1. Copy the firmware for Vivado
 
 Vivado reads the firmware from `hw/firmware.mem`, a copy of
@@ -261,6 +274,10 @@ make -C firmware && cp firmware/build/firmware.hex hw/firmware.mem
 3. Add `hw/constraints/basys3_soc.xdc` as the constraint file.
 4. Choose the part **xc7a35tcpg236-1**.
 5. Make sure `basys3_top` is the top module (bold in the Sources window).
+
+For the Nexys A7-100T, make a second project (for example name `nexys`, location
+the repository's `vivado/` folder) with `nexys_a7_top.v`, `nexys_a7_soc.xdc` and
+the part `xc7a100tcsg324-1`, and the same other files.
 6. **Generate Bitstream**. In the Messages window,
    `$readmem data file 'firmware.mem' is read successfully` must appear;
    otherwise the RAM is empty and the CPU runs nothing. The Project Summary
@@ -271,13 +288,17 @@ project open (paths use `/`, also on Windows):
 
 ```
 cd C:/path/to/Ec601_mouseRISCV/hw
+source build.tcl                      ;# Basys 3
+
+set board nexys_a7                    ;# Nexys A7-100T
 source build.tcl
 ```
 
 `build.tcl` reads the RTL, the constraints and `firmware.mem`, runs synthesis
-and implementation for the **xc7a35tcpg236-1**, and writes
-`hw/build/basys3_soc.bit` with timing and utilization reports. It ends by
-printing whether timing is met at 100 MHz.
+and implementation for the chosen board, and writes `hw/build/basys3_soc.bit`
+or `hw/build/nexys_a7_soc.bit` with timing and utilization reports. It ends by
+printing whether timing is met at 100 MHz. The `board` setting stays in effect
+for the rest of the Tcl session, including `program.tcl`.
 
 ### 3. Program the board
 
@@ -315,7 +336,7 @@ python3 host/draw_digit.py --board
 
 | Board | Function |
 |---|---|
-| Center button (BTNC) | Reset the CPU |
+| Center button (BTNC); on the Nexys A7 also the red CPU RESET button | Reset the CPU |
 | Micro-USB (PROG/UART) | Programming, and UART at 115200 baud, 8N1 |
 | Rightmost 7-segment digit | Last recognized digit |
 | LD0-LD9 | LD*n* on when the last digit was *n* |
@@ -446,13 +467,15 @@ Ec601_mouseRISCV/
 │   │   ├── picorv32.v      # PicoRV32 RISC-V CPU (YosysHQ, unmodified)
 │   │   ├── soc.v           # CPU + 128 KB RAM + UART + LED and 7-segment registers
 │   │   ├── uart.v          # UART transmitter and receiver
-│   │   ├── basys3_top.v    # board top level: clock, reset button, 7-segment scanning
+│   │   ├── basys3_top.v    # Basys 3 top level: clock, reset button, 7-segment scanning
+│   │   ├── nexys_a7_top.v  # Nexys A7-100T top level: same, for that board's pins
 │   │   └── sw_led.v        # switch-to-LED test for checking the Vivado flow
 │   ├── constraints/
-│   │   ├── basys3_soc.xdc     # pins and 100 MHz clock for the SoC
+│   │   ├── basys3_soc.xdc     # Basys 3 pins and 100 MHz clock for the SoC
+│   │   ├── nexys_a7_soc.xdc   # Nexys A7-100T pins and clock (from Digilent's master file)
 │   │   └── basys3_sw_led.xdc  # pins for the LED test
-│   ├── build.tcl           # Vivado: build the bitstream
-│   ├── program.tcl         # Vivado: program the board
+│   ├── build.tcl           # Vivado: build the bitstream (Basys 3 or Nexys A7)
+│   ├── program.tcl         # Vivado: program the board (Basys 3 or Nexys A7)
 │   └── firmware.mem        # firmware for Vivado (copy of firmware/build/firmware.hex)
 ├── sim/
 │   ├── sim_main.cpp        # Verilator testbench: plays the laptop, checks logits, counts cycles
